@@ -37,6 +37,7 @@ for pocket_idx, (receptor_name, ligand_name) in enumerate(tqdm(test_set)):
 
         method_pocket_dir = Path(basedir, method, f'pocket_{pocket_idx}')
 
+        # Further code does not make any sence, since we do not have these folders...
         generated_mols = [Chem.SDMolSupplier(str(file), sanitize=False)[0]
                           for file in method_pocket_dir.glob(f'mol_*.sdf')]
 

@@ -86,7 +86,7 @@ if __name__ == "__main__":
                 with open(txt_file, 'r') as f:
                     resi_list = f.read().split()
 
-                if args.fix_n_nodes:
+                if args.fix_n_nodes: # false
                     # some ligands (e.g. 6JWS_bio1_PT1:A:801) could not be read with sanitize=True
                     suppl = Chem.SDMolSupplier(str(sdf_file), sanitize=False)
                     num_nodes_lig = suppl[0].GetNumAtoms()

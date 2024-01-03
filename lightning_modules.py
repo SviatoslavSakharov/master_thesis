@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-import pytorch_lightning as pl
+import lightning as pl
 import wandb
 from torch_scatter import scatter_add, scatter_mean
 from Bio.PDB import PDBParser
@@ -379,7 +379,7 @@ class LigandPocketDDPM(pl.LightningModule):
     def test_step(self, data, *args):
         self._shared_eval(data, 'test', *args)
 
-    def validation_epoch_end(self, validation_step_outputs):
+    def on_validation_epoch_end(self):
 
         # Perform validation on single GPU
         if not self.trainer.is_global_zero:
@@ -871,8 +871,7 @@ class LigandPocketDDPM(pl.LightningModule):
 
         return molecules
 
-    def configure_gradient_clipping(self, optimizer, optimizer_idx,
-                                    gradient_clip_val, gradient_clip_algorithm):
+    def configure_gradient_clipping(self, optimizer, gradient_clip_val, gradient_clip_algorithm):
 
         if not self.clip_grad:
             return

@@ -22,6 +22,7 @@ from analysis.metrics import rdmol_to_smiles
 import constants
 from constants import covalent_radii, dataset_params
 
+import warnings
 
 def process_ligand_and_pocket(pdbfile, sdffile,
                               atom_dict, dist_cutoff, ca_only):
@@ -34,6 +35,7 @@ def process_ligand_and_pocket(pdbfile, sdffile,
 
     # remove H atoms if not in atom_dict, other atom types that aren't allowed
     # should stay so that the entire ligand can be removed from the dataset
+    # SVIAT: Does not make any sence, since all ligand atoms are present in atom_dict
     lig_atoms = [a.GetSymbol() for a in ligand.GetAtoms()
                  if (a.GetSymbol().capitalize() in atom_dict or a.element != 'H')]
     lig_coords = np.array([list(ligand.GetConformer(0).GetAtomPosition(idx))
@@ -69,8 +71,11 @@ def process_ligand_and_pocket(pdbfile, sdffile,
             for res in pocket_residues:
                 for atom in res.get_atoms():
                     if atom.name == 'CA':
-                        pocket_one_hot.append(np.eye(1, len(amino_acid_dict),
-                                                     amino_acid_dict[three_to_one(res.get_resname())]).squeeze())
+                        # SVIAT: three_to_one: convert three letter amino acid code to one letter
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            pocket_one_hot.append(np.eye(1, len(amino_acid_dict),
+                                                        amino_acid_dict[three_to_one(res.get_resname())]).squeeze())
                         full_coords.append(atom.coord)
             pocket_one_hot = np.stack(pocket_one_hot)
             full_coords = np.stack(full_coords)
@@ -251,6 +256,7 @@ if __name__ == '__main__':
 
     datadir = args.basedir / 'crossdocked_pocket10/'
 
+    # If alpha carbon (Cα) atoms only are used:
     if args.ca_only:
         dataset_info = dataset_params['crossdock']
     else:
@@ -282,6 +288,7 @@ if __name__ == '__main__':
     n_train_before = len(data_split['train'])
     n_val_before = len(data_split['val'])
     n_test_before = len(data_split['test'])
+    print(f'Number of training examples before processing: {n_train_before}, val: {n_val_before}, test: {n_test_before}')
 
     failed_save = []
 
@@ -386,8 +393,9 @@ if __name__ == '__main__':
         pocket_one_hot = data['pocket_one_hot']
 
     # Compute SMILES for all training examples
-    train_smiles = compute_smiles(lig_coords, lig_one_hot, lig_mask)
-    np.save(processed_dir / 'train_smiles.npy', train_smiles)
+    
+    # train_smiles = compute_smiles(lig_coords, lig_one_hot, lig_mask)
+    # np.save(processed_dir / 'train_smiles.npy', train_smiles)
 
     # Joint histogram of number of ligand and pocket nodes
     n_nodes = get_n_nodes(lig_mask, pocket_mask, smooth_sigma=1.0)

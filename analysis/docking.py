@@ -8,9 +8,11 @@ import argparse
 import pandas as pd
 from rdkit import Chem
 from tqdm import tqdm
+import sys 
+sys.path.append(os.getcwd() + '/..')
 
 try:
-    import utils
+    from master_thesis import utils
 except ModuleNotFoundError as e:
     print(e)
 
@@ -93,7 +95,7 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
 
             # run QuickVina 2
             out = os.popen(
-                f'qvina2.1 --receptor {receptor_pdbqt_file} '
+                f'/home/domainHomes/ssakharov/master_thesis/qvina2.1 --receptor {receptor_pdbqt_file} '
                 f'--ligand {ligand_pdbqt_file} '
                 f'--center_x {cx:.4f} --center_y {cy:.4f} --center_z {cz:.4f} '
                 f'--size_x {size} --size_y {size} --size_z {size} '
@@ -151,6 +153,7 @@ if __name__ == '__main__':
     results_dict = {}
     sdf_files = list(args.sdf_dir.glob('[!.]*.sdf')) \
         if args.sdf_dir is not None else args.sdf_files
+    print(f"Found {len(sdf_files)} sdf files")
     pbar = tqdm(sdf_files)
     for sdf_file in pbar:
         pbar.set_description(f'Processing {sdf_file.name}')
@@ -168,7 +171,7 @@ if __name__ == '__main__':
             receptor_file = Path(args.pdbqt_dir, receptor_name + '.pdbqt')
         elif args.dataset == 'crossdocked':
             ligand_name = sdf_file.stem
-            receptor_name = ligand_name[:-4]
+            receptor_name = ligand_name[:-4].split('_')[0]
             receptor_file = Path(args.pdbqt_dir, receptor_name + '.pdbqt')
 
         # try:

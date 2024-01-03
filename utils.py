@@ -82,7 +82,7 @@ def write_sdf_file(sdf_path, molecules):
         if m is not None:
             w.write(m)
 
-    # print(f'Wrote SDF file to {sdf_path}')
+    print(f'Wrote SDF file to {sdf_path}')
 
 
 def residues_to_atoms(x_ca, atom_encoder):

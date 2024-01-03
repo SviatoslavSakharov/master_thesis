@@ -4,7 +4,7 @@ from pathlib import Path
 import warnings
 
 import torch
-import pytorch_lightning as pl
+import lightning as pl
 import yaml
 import numpy as np
 
@@ -86,10 +86,10 @@ if __name__ == "__main__":
         mode=args.mode,
         node_histogram=histogram,
         pocket_representation=args.pocket_representation,
-        virtual_nodes=args.virtual_nodes
+        # virtual_nodes=args.virtual_nodes
     )
 
-    logger = pl.loggers.WandbLogger(
+    logger = pl.pytorch.loggers.wandb.WandbLogger(
         save_dir=args.logdir,
         project='ligand-pocket-ddpm',
         group=args.wandb_params.group,
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         mode=args.wandb_params.mode,
     )
 
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
         dirpath=Path(out_dir, 'checkpoints'),
         filename="best-model-epoch={epoch:02d}",
         monitor="loss/val",
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         enable_progress_bar=args.enable_progress_bar,
         num_sanity_val_steps=args.num_sanity_val_steps,
         accelerator='gpu', devices=args.gpus,
-        strategy=('ddp' if args.gpus > 1 else None)
+        strategy=('ddp' if args.gpus > 1 else "auto")
     )
 
     trainer.fit(model=pl_module, ckpt_path=ckpt_path)

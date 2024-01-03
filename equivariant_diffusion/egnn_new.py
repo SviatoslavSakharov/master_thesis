@@ -35,7 +35,7 @@ class GCL(nn.Module):
             out = torch.cat([source, target, edge_attr], dim=1)
         mij = self.edge_mlp(out)
 
-        if self.attention:
+        if self.attention: # always True
             att_val = self.att_mlp(mij)
             out = mij * att_val
         else:
@@ -164,11 +164,13 @@ class EquivariantBlock(nn.Module):
                 edge_attr=None, update_coords_mask=None, batch_mask=None):
         # Edit Emiel: Remove velocity as input
         distances, coord_diff = coord2diff(x, edge_index, self.norm_constant)
+        # Always False 
         if self.reflection_equiv:
             coord_cross = None
         else:
             coord_cross = coord2cross(x, edge_index, batch_mask,
                                       self.norm_constant)
+        ### sin embedding is none
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
         edge_attr = torch.cat([distances, edge_attr], dim=1)
@@ -226,8 +228,10 @@ class EGNN(nn.Module):
                 batch_mask=None, edge_attr=None):
         # Edit Emiel: Remove velocity as input
         edge_feat, _ = coord2diff(x, edge_index)
+        ### sin embedding is none
         if self.sin_embedding is not None:
             edge_feat = self.sin_embedding(edge_feat)
+        ### Not for crossdocking, only for MOAD
         if edge_attr is not None:
             edge_feat = torch.cat([edge_feat, edge_attr], dim=1)
         h = self.embedding(h)
