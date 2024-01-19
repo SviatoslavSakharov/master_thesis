@@ -501,7 +501,7 @@ class EnVariationalDiffusion(nn.Module):
         return zt_lig, zt_pocket
 
     def sample_p_zs_given_zt(self, s, t, zt_lig, zt_pocket, ligand_mask,
-                             pocket_mask, fix_noise=False):
+                             pocket_mask, fix_noise=False, ddim=True):
         """Samples from zs ~ p(zs | zt). Only used during sampling."""
         gamma_s = self.gamma(s)
         gamma_t = self.gamma(t)
@@ -529,20 +529,28 @@ class EnVariationalDiffusion(nn.Module):
 
         # Note: mu_{t->s} = 1 / alpha_{t|s} z_t - sigma_{t|s}^2 / sigma_t / alpha_{t|s} epsilon
         # follows from the definition of mu_{t->s} and Equ. (7) in the EDM paper
-        mu_lig = zt_lig / alpha_t_given_s[ligand_mask] - \
-                 (sigma2_t_given_s / alpha_t_given_s / sigma_t)[ligand_mask] * \
-                 eps_t_lig
-        mu_pocket = zt_pocket / alpha_t_given_s[pocket_mask] - \
-                    (sigma2_t_given_s / alpha_t_given_s / sigma_t)[pocket_mask] * \
-                    eps_t_pocket
+        if ddim:
+            zs_lig = zt_lig / alpha_t_given_s[ligand_mask] - \
+                        (sigma_t / alpha_t_given_s + sigma_s)[ligand_mask] * \
+                        eps_t_lig
+            zs_pocket = zt_pocket / alpha_t_given_s[pocket_mask] - \
+                        (sigma_t / alpha_t_given_s + sigma_s)[pocket_mask] * \
+                        eps_t_pocket
+        else:
+            mu_lig = zt_lig / alpha_t_given_s[ligand_mask] - \
+                    (sigma2_t_given_s / alpha_t_given_s / sigma_t)[ligand_mask] * \
+                    eps_t_lig
+            mu_pocket = zt_pocket / alpha_t_given_s[pocket_mask] - \
+                        (sigma2_t_given_s / alpha_t_given_s / sigma_t)[pocket_mask] * \
+                        eps_t_pocket
 
-        # Compute sigma for p(zs | zt).
-        sigma = sigma_t_given_s * sigma_s / sigma_t
+            # Compute sigma for p(zs | zt).
+            sigma = sigma_t_given_s * sigma_s / sigma_t
 
-        # Sample zs given the paramters derived from zt.
-        zs_lig, zs_pocket = self.sample_normal(mu_lig, mu_pocket, sigma,
-                                               ligand_mask, pocket_mask,
-                                               fix_noise)
+            # Sample zs given the paramters derived from zt.
+            zs_lig, zs_pocket = self.sample_normal(mu_lig, mu_pocket, sigma,
+                                                ligand_mask, pocket_mask,
+                                                fix_noise)
 
         # Project down to avoid numerical runaway of the center of gravity.
         zs_x = self.remove_mean_batch(
