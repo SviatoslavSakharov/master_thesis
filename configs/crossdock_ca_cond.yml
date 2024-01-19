@@ -1,21 +1,22 @@
-run_name: 'SE3-cond-CA'
-logdir: '/path/to/logdir'
+run_name: 'SE3-cond-CA-paper'
+logdir: '/home/domainHomes/ssakharov/master_thesis/logdir'
 wandb_params:
   mode: 'online'  # disabled, offline, online
-  entity: 'my_username'
+  entity: 'sviatoslavs999'
+  group: null
 dataset: 'crossdock'
-datadir: '/path/to/processed_crossdock_noH_ca_only'
+datadir: '/home/domainHomes/ssakharov/master_thesis/crossdocked/processed_crossdock_noH_ca_only_temp'
 enable_progress_bar: True
 num_sanity_val_steps: 0
 
 mode: 'pocket_conditioning'  # joint, pocket_conditioning
 pocket_representation: 'CA'  # CA, full-atom
-batch_size: 96
+batch_size: 32
 lr: 1.0e-3
 noise_factor: 1.0
 n_epochs: 1000
 num_workers: 0
-gpus: 4
+gpus: 1
 clip_grad: True
 augment_rotation: False
 augment_noise: 0
@@ -57,6 +58,6 @@ visualize_chain_epoch: 50
 eval_params:
   n_eval_samples: 100
   eval_batch_size: 100
-  smiles_file: '/path/to/train_smiles.npy'
+  smiles_file: null #'/path/to/train_smiles.npy'
   n_visualize_samples: 5
   keep_frames: 100
