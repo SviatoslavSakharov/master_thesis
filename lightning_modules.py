@@ -19,6 +19,7 @@ from equivariant_diffusion.dynamics import EGNNDynamics
 from equivariant_diffusion.en_diffusion import EnVariationalDiffusion
 from equivariant_diffusion.conditional_model import ConditionalDDPM, \
     SimpleConditionalDDPM
+from equivariant_diffusion.style_encoder import StyleEncoder
 from dataset import ProcessedLigandPocketDataset
 import utils
 from analysis.visualization import save_xyz_file, visualize, visualize_chain
@@ -158,8 +159,33 @@ class LigandPocketDDPM(pl.LightningModule):
             edge_embedding_dim=egnn_params.__dict__.get('edge_embedding_dim'),
         )
 
+        self.style_encoder = StyleEncoder(
+            atom_nf=self.atom_nf,
+            residue_nf=self.aa_nf,
+            n_dims=self.x_dims,
+            joint_nf=egnn_params.joint_nf,
+            device=egnn_params.device if torch.cuda.is_available() else 'cpu',
+            hidden_nf=egnn_params.hidden_nf,
+            act_fn=torch.nn.SiLU(),
+            n_layers=egnn_params.n_layers,
+            attention=egnn_params.attention,
+            tanh=egnn_params.tanh,
+            norm_constant=egnn_params.norm_constant,
+            inv_sublayers=egnn_params.inv_sublayers,
+            sin_embedding=egnn_params.sin_embedding,
+            normalization_factor=egnn_params.normalization_factor,
+            aggregation_method=egnn_params.aggregation_method,
+            edge_cutoff_ligand=egnn_params.__dict__.get('edge_cutoff_ligand'),
+            edge_cutoff_pocket=egnn_params.__dict__.get('edge_cutoff_pocket'),
+            edge_cutoff_interaction=egnn_params.__dict__.get('edge_cutoff_interaction'),
+            update_pocket_coords=(self.mode == 'joint'),
+            reflection_equivariant=egnn_params.reflection_equivariant,
+            edge_embedding_dim=egnn_params.__dict__.get('edge_embedding_dim'),
+        )
+
         self.ddpm = ddpm_models[self.mode](
                 dynamics=net_dynamics,
+                style_encoder=self.style_encoder,
                 atom_nf=self.atom_nf,
                 residue_nf=self.aa_nf,
                 n_dims=self.x_dims,

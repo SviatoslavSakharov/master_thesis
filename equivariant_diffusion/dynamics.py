@@ -84,7 +84,7 @@ class EGNNDynamics(nn.Module):
         self.n_dims = n_dims
         self.condition_time = condition_time
 
-    def forward(self, xh_atoms, xh_residues, t, mask_atoms, mask_residues):
+    def forward(self, xh_atoms, xh_residues, t, mask_atoms, mask_residues, style_vector=None):
 
         x_atoms = xh_atoms[:, :self.n_dims].clone()
         h_atoms = xh_atoms[:, self.n_dims:].clone()
@@ -132,7 +132,7 @@ class EGNNDynamics(nn.Module):
                                 torch.zeros_like(mask_residues))).unsqueeze(1)
             h_final, x_final = self.egnn(h, x, edges,
                                          update_coords_mask=update_coords_mask,
-                                         batch_mask=mask, edge_attr=edge_types)
+                                         batch_mask=mask, edge_attr=edge_types, style_vector=style_vector, mask_atoms=mask_atoms, mask_residues=mask_residues)
             vel = (x_final - x)
 
         elif self.mode == 'gnn_dynamics':

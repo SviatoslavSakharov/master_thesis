@@ -17,7 +17,7 @@ class EnVariationalDiffusion(nn.Module):
 
     def __init__(
             self,
-            dynamics: nn.Module, atom_nf: int, residue_nf: int,
+            dynamics: nn.Module, style_encoder: nn.Module, atom_nf: int, residue_nf: int,
             n_dims: int, size_histogram: Dict,
             timesteps: int = 1000, parametrization='eps',
             noise_schedule='learned', noise_precision=1e-4,
@@ -43,6 +43,7 @@ class EnVariationalDiffusion(nn.Module):
 
         # The network that will predict the denoising.
         self.dynamics = dynamics
+        self.style_encoder = style_encoder
 
         self.atom_nf = atom_nf
         self.residue_nf = residue_nf
@@ -369,6 +370,8 @@ class EnVariationalDiffusion(nn.Module):
         xh_lig = torch.cat([ligand['x'], ligand['one_hot']], dim=1)
         xh_pocket = torch.cat([pocket['x'], pocket['one_hot']], dim=1)
 
+        style_ligand = self.style_encoder(xh_lig, xh_pocket, ligand['mask'],  pocket['mask'])
+
         # Find noised representation
         z_t_lig, z_t_pocket, eps_t_lig, eps_t_pocket = \
             self.noised_representation(xh_lig, xh_pocket, ligand['mask'],
@@ -376,7 +379,7 @@ class EnVariationalDiffusion(nn.Module):
 
         # Neural net prediction.
         net_out_lig, net_out_pocket = self.dynamics(
-            z_t_lig, z_t_pocket, t, ligand['mask'], pocket['mask'])
+            z_t_lig, z_t_pocket, t, ligand['mask'], pocket['mask'], style_vector=style_ligand)
 
         # For LJ loss term
         xh_lig_hat = self.xh_given_zt_and_epsilon(z_t_lig, net_out_lig, gamma_t,
