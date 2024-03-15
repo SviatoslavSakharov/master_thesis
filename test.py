@@ -11,11 +11,18 @@ from lightning_modules import LigandPocketDDPM
 from analysis.molecule_builder import process_molecule
 import utils
 
+import random
+import numpy as np
+
 MAXITER = 10
 MAXNTRIES = 10
 
 
 if __name__ == "__main__":
+    torch.manual_seed(42)
+    random.seed(42)
+    np.random.seed(42)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('checkpoint', type=Path)
     parser.add_argument('--test_dir', type=Path)
@@ -33,6 +40,8 @@ if __name__ == "__main__":
     parser.add_argument('--n_nodes_bias', type=int, default=0)
     parser.add_argument('--n_nodes_min', type=int, default=0)
     parser.add_argument('--skip_existing', action='store_true')
+    parser.add_argument('--ddim', type=int, default=0)
+    parser.add_argument('--ddim_nu', type=float, default=1.)
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -116,7 +125,8 @@ if __name__ == "__main__":
                         n_nodes_bias=args.n_nodes_bias,
                         n_nodes_min=args.n_nodes_min,
                         resamplings=args.resamplings,
-                        jump_length=args.jump_length)
+                        jump_length=args.jump_length,
+                        ddim=args.ddim, ddim_nu=args.ddim_nu)
 
                     all_molecules.extend(mols_batch)
 
@@ -136,6 +146,7 @@ if __name__ == "__main__":
 
                 # Remove excess molecules from list
                 valid_molecules = valid_molecules[:args.n_samples]
+                print(f"len valid molecules: {len(valid_molecules)}")
 
                 # Reorder raw files
                 all_molecules = \
@@ -147,7 +158,8 @@ if __name__ == "__main__":
                 # Write SDF files
                 utils.write_sdf_file(sdf_out_file_raw, all_molecules)
                 utils.write_sdf_file(sdf_out_file_processed, valid_molecules)
-
+                print(f"file written: {sdf_out_file_processed}")
+                # assert False, 'TODO: fix this'
                 # Time the sampling process
                 time_per_pocket[str(sdf_file)] = time() - t_pocket_start
                 with open(time_file, 'w') as f:

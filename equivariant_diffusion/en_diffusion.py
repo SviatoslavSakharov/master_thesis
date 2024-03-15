@@ -262,7 +262,7 @@ class EnVariationalDiffusion(nn.Module):
                log_p_x_given_z0_without_constants_pocket, log_ph_given_z0
 
     def sample_p_xh_given_z0(self, z0_lig, z0_pocket, lig_mask, pocket_mask,
-                             batch_size, fix_noise=False):
+                             batch_size, fix_noise=False, ddim=0):
         """Samples x ~ p(x|z0)."""
         t_zeros = torch.zeros(size=(batch_size, 1), device=z0_lig.device)
         gamma_0 = self.gamma(t_zeros)
@@ -274,9 +274,12 @@ class EnVariationalDiffusion(nn.Module):
         # Compute mu for p(zs | zt).
         mu_x_lig = self.compute_x_pred(net_out_lig, z0_lig, gamma_0, lig_mask)
         mu_x_pocket = self.compute_x_pred(net_out_pocket, z0_pocket, gamma_0,
-                                          pocket_mask)
-        xh_lig, xh_pocket = self.sample_normal(mu_x_lig, mu_x_pocket, sigma_x,
-                                               lig_mask, pocket_mask, fix_noise)
+                                        pocket_mask)
+        if ddim > 0:
+            xh_lig, xh_pocket =  mu_x_lig, mu_x_pocket
+        else:
+            xh_lig, xh_pocket = self.sample_normal(mu_x_lig, mu_x_pocket, sigma_x,
+                                                lig_mask, pocket_mask, fix_noise)
 
         x_lig, h_lig = self.unnormalize(
             xh_lig[:, :self.n_dims], z0_lig[:, self.n_dims:])
@@ -504,7 +507,7 @@ class EnVariationalDiffusion(nn.Module):
         return zt_lig, zt_pocket
 
     def sample_p_zs_given_zt(self, s, t, zt_lig, zt_pocket, ligand_mask,
-                             pocket_mask, fix_noise=False, ddim=True):
+                             pocket_mask, fix_noise=False, ddim=0, ddim_nu=1):
         """Samples from zs ~ p(zs | zt). Only used during sampling."""
         gamma_s = self.gamma(s)
         gamma_t = self.gamma(t)
@@ -532,13 +535,19 @@ class EnVariationalDiffusion(nn.Module):
 
         # Note: mu_{t->s} = 1 / alpha_{t|s} z_t - sigma_{t|s}^2 / sigma_t / alpha_{t|s} epsilon
         # follows from the definition of mu_{t->s} and Equ. (7) in the EDM paper
-        if ddim:
-            zs_lig = zt_lig / alpha_t_given_s[ligand_mask] - \
-                        (sigma_t / alpha_t_given_s + sigma_s)[ligand_mask] * \
-                        eps_t_lig
-            zs_pocket = zt_pocket / alpha_t_given_s[pocket_mask] - \
-                        (sigma_t / alpha_t_given_s + sigma_s)[pocket_mask] * \
-                        eps_t_pocket
+        if ddim>0:
+            alpha_s = self.alpha(gamma_s, zt_lig)
+            alpha_t = self.alpha(gamma_t, zt_lig)
+            sigma = ddim_nu * torch.sqrt((1-alpha_s**2) / (1-alpha_t**2)) * torch.sqrt(1-(alpha_t/alpha_s)**2)
+
+            mu_lig = (alpha_s/alpha_t)[ligand_mask] * (zt_lig - torch.sqrt(1-alpha_t**2)[ligand_mask] * eps_t_lig) + \
+                        torch.sqrt(1-alpha_s**2 - sigma**2)[ligand_mask] * eps_t_lig
+            mu_pocket = (alpha_s/alpha_t)[pocket_mask] * (zt_pocket - torch.sqrt(1-alpha_t**2)[pocket_mask] * eps_t_pocket) + \
+                        torch.sqrt(1-alpha_s**2 - sigma**2)[pocket_mask] * eps_t_pocket
+
+            zs_lig, zs_pocket = self.sample_normal(mu_lig, mu_pocket, sigma,
+                                                ligand_mask, pocket_mask,
+                                                fix_noise)
         else:
             mu_lig = zt_lig / alpha_t_given_s[ligand_mask] - \
                     (sigma2_t_given_s / alpha_t_given_s / sigma_t)[ligand_mask] * \
@@ -686,7 +695,7 @@ class EnVariationalDiffusion(nn.Module):
 
     @torch.no_grad()
     def inpaint(self, ligand, pocket, lig_fixed, pocket_fixed, resamplings=1,
-                jump_length=1, return_frames=1, timesteps=None):
+                jump_length=1, return_frames=1, timesteps=None, ddim=0, ddim_nu=1):
         """
         Draw samples from the generative model while fixing parts of the input.
         Optionally, return intermediate states for visualization purposes.
@@ -739,13 +748,29 @@ class EnVariationalDiffusion(nn.Module):
 
         # Iteratively sample according to a pre-defined schedule
         schedule = self.get_repaint_schedule(resamplings, jump_length, timesteps)
-        s = timesteps - 1
+        if ddim > 0:
+            ## uncomment for linear schedule
+            # skip = timesteps // ddim
+            # seq = range(0, timesteps, skip)
+            # s = seq[-1]
+            ## uncomment for squeared schedule
+            seq = (np.linspace( 0, (timesteps *0.8 )**(1/2), ddim)** 2)
+            seq = [int(s) for s in list(seq)]
+            s = seq[-1]
+        else:
+            skip = 1
+            s = timesteps - 1
         for i, n_denoise_steps in enumerate(schedule):
             for j in range(n_denoise_steps):
                 # Denoise one time step: t -> s
                 s_array = torch.full((n_samples, 1), fill_value=s,
                                      device=z_lig.device)
-                t_array = s_array + 1
+                if ddim > 0:
+                    t_array = torch.full((n_samples, 1), fill_value=timesteps if j==0 else seq[-j],
+                                         device=z_lig.device)
+                else:
+                    t_array = s_array + 1
+                # print(f"Current s {s_array[0]}, t = {t_array[0]}")
                 s_array = s_array / timesteps
                 t_array = t_array / timesteps
 
@@ -758,7 +783,7 @@ class EnVariationalDiffusion(nn.Module):
                 # sample inpainted part
                 z_lig_unknown, z_pocket_unknown = self.sample_p_zs_given_zt(
                     s_array, t_array, z_lig, z_pocket, ligand['mask'],
-                    pocket['mask'])
+                    pocket['mask'], ddim=ddim, ddim_nu=ddim_nu)
 
                 # move center of mass of the noised part to the center of mass
                 # of the corresponding denoised part before combining them
@@ -818,12 +843,18 @@ class EnVariationalDiffusion(nn.Module):
                         gamma_t, gamma_s)
 
                     s = t
-
-                s -= 1
+                if ddim > 0:
+                    if -j - 2 < -len(seq):
+                        break
+                    s = seq[-j-2]
+                else:
+                    s -= 1
+                if s < 0:
+                    break
 
         # Finally sample p(x, h | z_0).
         x_lig, h_lig, x_pocket, h_pocket = self.sample_p_xh_given_z0(
-            z_lig, z_pocket, ligand['mask'], pocket['mask'], n_samples)
+            z_lig, z_pocket, ligand['mask'], pocket['mask'], n_samples, ddim=ddim)
 
         self.assert_mean_zero_with_mask(
             torch.cat((x_lig, x_pocket), dim=0), combined_mask

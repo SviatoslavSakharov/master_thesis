@@ -780,7 +780,7 @@ class LigandPocketDDPM(pl.LightningModule):
     def generate_ligands(self, pdb_file, n_samples, pocket_ids=None,
                          ref_ligand=None, num_nodes_lig=None, sanitize=False,
                          largest_frag=False, relax_iter=0, timesteps=None,
-                         n_nodes_bias=0, n_nodes_min=0, **kwargs):
+                         n_nodes_bias=0, n_nodes_min=0, ddim=0, ddim_nu=1, **kwargs):
         """
         Generate ligands given a pocket
         Args:
@@ -857,7 +857,7 @@ class LigandPocketDDPM(pl.LightningModule):
 
             xh_lig, xh_pocket, lig_mask, pocket_mask = self.ddpm.inpaint(
                 ligand, pocket, lig_mask_fixed, pocket_mask_fixed,
-                timesteps=timesteps, **kwargs)
+                timesteps=timesteps, ddim=ddim, ddim_nu=ddim_nu, **kwargs)
 
         # Use conditional generation
         elif type(self.ddpm) == ConditionalDDPM:
