@@ -180,7 +180,7 @@ class MoleculeProperties:
         fp2 = Chem.RDKFingerprint(mol_b)
         return DataStructs.TanimotoSimilarity(fp1, fp2)
 
-    def evaluate(self, pocket_rdmols):
+    def evaluate(self, pocket_rdmols, position=0, desc="Evaluation"):
         """
         Run full evaluation
         Args:
@@ -190,39 +190,40 @@ class MoleculeProperties:
             QED, SA, LogP, Lipinski (per molecule), and Diversity (per pocket)
         """
 
-        for pocket in pocket_rdmols:
-            for mol in pocket:
-                Chem.SanitizeMol(mol)
-                assert mol is not None, "only evaluate valid molecules"
+        # for pocket in pocket_rdmols:
+        #     for mol in pocket:
+        #         Chem.SanitizeMol(mol)
+        #         assert mol is not None, "only evaluate valid molecules"
 
         all_qed = []
         all_sa = []
         all_logp = []
         all_lipinski = []
         per_pocket_diversity = []
-        for pocket in tqdm(pocket_rdmols):
-            all_qed.append([self.calculate_qed(mol) for mol in pocket])
-            all_sa.append([self.calculate_sa(mol) for mol in pocket])
-            all_logp.append([self.calculate_logp(mol) for mol in pocket])
-            all_lipinski.append([self.calculate_lipinski(mol) for mol in pocket])
-            per_pocket_diversity.append(self.calculate_diversity(pocket))
+        for pocket in tqdm(pocket_rdmols, position=position, desc=desc):
+            all_qed.append([self.calculate_qed(mol) if mol is not None else None for mol in pocket])
+            all_sa.append([self.calculate_sa(mol) if mol is not None else None for mol in pocket])
+            all_logp.append([self.calculate_logp(mol) if mol is not None else None for mol in pocket])
+            all_lipinski.append([self.calculate_lipinski(mol) if mol is not None else None for mol in pocket])
+            per_pocket_diversity.append(self.calculate_diversity([mol for mol in pocket if mol is not None]))
 
-        print(f"{sum([len(p) for p in pocket_rdmols])} molecules from "
-              f"{len(pocket_rdmols)} pockets evaluated.")
+        if position == 0:
+            print(f"{sum([len(p) for p in pocket_rdmols])} molecules from "
+                f"{len(pocket_rdmols)} pockets evaluated.")
 
-        qed_flattened = [x for px in all_qed for x in px]
-        print(f"QED: {np.mean(qed_flattened):.3f} \pm {np.std(qed_flattened):.2f}")
+            qed_flattened = [x for px in all_qed for x in px]
+            print(f"QED: {np.mean(qed_flattened):.3f} \pm {np.std(qed_flattened):.2f}")
 
-        sa_flattened = [x for px in all_sa for x in px]
-        print(f"SA: {np.mean(sa_flattened):.3f} \pm {np.std(sa_flattened):.2f}")
+            sa_flattened = [x for px in all_sa for x in px]
+            print(f"SA: {np.mean(sa_flattened):.3f} \pm {np.std(sa_flattened):.2f}")
 
-        logp_flattened = [x for px in all_logp for x in px]
-        print(f"LogP: {np.mean(logp_flattened):.3f} \pm {np.std(logp_flattened):.2f}")
+            logp_flattened = [x for px in all_logp for x in px]
+            print(f"LogP: {np.mean(logp_flattened):.3f} \pm {np.std(logp_flattened):.2f}")
 
-        lipinski_flattened = [x for px in all_lipinski for x in px]
-        print(f"Lipinski: {np.mean(lipinski_flattened):.3f} \pm {np.std(lipinski_flattened):.2f}")
+            lipinski_flattened = [x for px in all_lipinski for x in px]
+            print(f"Lipinski: {np.mean(lipinski_flattened):.3f} \pm {np.std(lipinski_flattened):.2f}")
 
-        print(f"Diversity: {np.mean(per_pocket_diversity):.3f} \pm {np.std(per_pocket_diversity):.2f}")
+            print(f"Diversity: {np.mean(per_pocket_diversity):.3f} \pm {np.std(per_pocket_diversity):.2f}")
 
         return all_qed, all_sa, all_logp, all_lipinski, per_pocket_diversity
 
