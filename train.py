@@ -9,6 +9,7 @@ import yaml
 import numpy as np
 
 from lightning_modules import LigandPocketDDPM
+from lightning.pytorch import Trainer, seed_everything
 
 
 def merge_args_and_yaml(args, config_dict):
@@ -42,6 +43,9 @@ def merge_configs(config, resume_config):
 # Training
 # ______________________________________________________________________________
 if __name__ == "__main__":
+
+    seed_everything(42, workers=True)
+
     p = argparse.ArgumentParser()
     p.add_argument('--config', type=str, required=True)
     p.add_argument('--resume', type=str, default=None)
