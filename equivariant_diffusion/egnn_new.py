@@ -63,7 +63,7 @@ class GCL(nn.Module):
 
             out_ligand = out[:len(mask_atoms)]
             out_pocket = out[len(mask_atoms):]
-            out_ligand_cond = out_ligand * style_embedding[mask_atoms]
+            out_ligand_cond = out_ligand + style_embedding[mask_atoms]
 
             out = torch.cat([out_ligand_cond, out_pocket], dim=0)
 
