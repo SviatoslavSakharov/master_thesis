@@ -1,4 +1,4 @@
-run_name: 'SE3-inpaint-CA-style-ligand-strong'
+run_name: 'SE3-inpaint-CA-style-ligand-strong-temp'
 logdir: '/home/ssviatoslav/master_thesis/logdir'
 # logdir: '/home/domainHomes/ssakharov/master_thesis/logdir'
 wandb_params:

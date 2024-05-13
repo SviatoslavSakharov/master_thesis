@@ -262,14 +262,14 @@ class EnVariationalDiffusion(nn.Module):
                log_p_x_given_z0_without_constants_pocket, log_ph_given_z0
 
     def sample_p_xh_given_z0(self, z0_lig, z0_pocket, lig_mask, pocket_mask,
-                             batch_size, fix_noise=False, ddim=0):
+                             batch_size, fix_noise=False, ddim=0, style_ligand=None):
         """Samples x ~ p(x|z0)."""
         t_zeros = torch.zeros(size=(batch_size, 1), device=z0_lig.device)
         gamma_0 = self.gamma(t_zeros)
         # Computes sqrt(sigma_0^2 / alpha_0^2)
         sigma_x = self.SNR(-0.5 * gamma_0)
         net_out_lig, net_out_pocket = self.dynamics(
-            z0_lig, z0_pocket, t_zeros, lig_mask, pocket_mask)
+            z0_lig, z0_pocket, t_zeros, lig_mask, pocket_mask, style_vector=style_ligand)
 
         # Compute mu for p(zs | zt).
         mu_x_lig = self.compute_x_pred(net_out_lig, z0_lig, gamma_0, lig_mask)
@@ -507,7 +507,7 @@ class EnVariationalDiffusion(nn.Module):
         return zt_lig, zt_pocket
 
     def sample_p_zs_given_zt(self, s, t, zt_lig, zt_pocket, ligand_mask,
-                             pocket_mask, fix_noise=False, ddim=0, ddim_nu=1):
+                             pocket_mask, fix_noise=False, ddim=0, ddim_nu=1, style_ligand=None):
         """Samples from zs ~ p(zs | zt). Only used during sampling."""
         gamma_s = self.gamma(s)
         gamma_t = self.gamma(t)
@@ -520,7 +520,7 @@ class EnVariationalDiffusion(nn.Module):
 
         # Neural net prediction.
         eps_t_lig, eps_t_pocket = self.dynamics(
-            zt_lig, zt_pocket, t, ligand_mask, pocket_mask)
+            zt_lig, zt_pocket, t, ligand_mask, pocket_mask, style_vector=style_ligand)
 
         # Compute mu for p(zs | zt).
         combined_mask = torch.cat((ligand_mask, pocket_mask))
@@ -695,7 +695,7 @@ class EnVariationalDiffusion(nn.Module):
 
     @torch.no_grad()
     def inpaint(self, ligand, pocket, lig_fixed, pocket_fixed, resamplings=1,
-                jump_length=1, return_frames=1, timesteps=None, ddim=0, ddim_nu=1):
+                jump_length=1, return_frames=1, timesteps=None, ddim=0, ddim_nu=1, style_ligand=None):
         """
         Draw samples from the generative model while fixing parts of the input.
         Optionally, return intermediate states for visualization purposes.
@@ -783,7 +783,7 @@ class EnVariationalDiffusion(nn.Module):
                 # sample inpainted part
                 z_lig_unknown, z_pocket_unknown = self.sample_p_zs_given_zt(
                     s_array, t_array, z_lig, z_pocket, ligand['mask'],
-                    pocket['mask'], ddim=ddim, ddim_nu=ddim_nu)
+                    pocket['mask'], ddim=ddim, ddim_nu=ddim_nu, style_ligand=style_ligand)
 
                 # move center of mass of the noised part to the center of mass
                 # of the corresponding denoised part before combining them
@@ -854,7 +854,7 @@ class EnVariationalDiffusion(nn.Module):
 
         # Finally sample p(x, h | z_0).
         x_lig, h_lig, x_pocket, h_pocket = self.sample_p_xh_given_z0(
-            z_lig, z_pocket, ligand['mask'], pocket['mask'], n_samples, ddim=ddim)
+            z_lig, z_pocket, ligand['mask'], pocket['mask'], n_samples, ddim=ddim, style_ligand=style_ligand)
 
         self.assert_mean_zero_with_mask(
             torch.cat((x_lig, x_pocket), dim=0), combined_mask

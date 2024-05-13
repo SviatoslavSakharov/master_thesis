@@ -42,9 +42,11 @@ if __name__ == "__main__":
     parser.add_argument('--skip_existing', action='store_true')
     parser.add_argument('--ddim', type=int, default=0)
     parser.add_argument('--ddim_nu', type=float, default=1.)
+    parser.add_argument('--style_vector', action='store_true')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # device = 'cpu'
 
     args.outdir.mkdir(exist_ok=args.skip_existing)
     raw_sdf_dir = Path(args.outdir, 'raw')
@@ -126,7 +128,7 @@ if __name__ == "__main__":
                         n_nodes_min=args.n_nodes_min,
                         resamplings=args.resamplings,
                         jump_length=args.jump_length,
-                        ddim=args.ddim, ddim_nu=args.ddim_nu)
+                        ddim=args.ddim, ddim_nu=args.ddim_nu, style_vector=args.style_vector, sdf_file=sdf_file)
 
                     all_molecules.extend(mols_batch)
 

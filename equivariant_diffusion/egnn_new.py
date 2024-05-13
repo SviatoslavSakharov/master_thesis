@@ -25,7 +25,7 @@ class GCL(nn.Module):
 
         self.conditional_linear_layer = nn.Linear(hidden_nf, hidden_nf)
 
-        self.layer_norm = nn.LayerNorm(hidden_nf)
+        # self.layer_norm = nn.LayerNorm(hidden_nf)
 
         if self.attention:
             self.att_mlp = nn.Sequential(

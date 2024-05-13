@@ -4,6 +4,9 @@ from typing import Optional
 from time import time
 from pathlib import Path
 
+from rdkit import Chem
+from constants import covalent_radii, dataset_params
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -737,6 +740,40 @@ class LigandPocketDDPM(pl.LightningModule):
                       name='/chain', batch_mask=mask_flat)
         visualize_chain(str(outdir), self.dataset_info, wandb=wandb)
 
+    def prepare_ligand(self, sdf_file, repeats=1):
+        dataset_info = dataset_params['crossdock']
+        atom_dict = dataset_info['atom_encoder']
+
+        ligand = Chem.SDMolSupplier(str(sdf_file))[0]
+
+        lig_atoms = [a.GetSymbol() for a in ligand.GetAtoms()
+                 if (a.GetSymbol().capitalize() in atom_dict or a.element != 'H')]
+        lig_coords = np.array([list(ligand.GetConformer(0).GetAtomPosition(idx))
+                            for idx in range(ligand.GetNumAtoms())])
+
+        try:
+            lig_one_hot = np.stack([
+                np.eye(1, len(atom_dict), atom_dict[a.capitalize()]).squeeze()
+                for a in lig_atoms
+            ])
+        except KeyError as e:
+            raise KeyError(
+                f'{e} not in atom dict ({sdffile})')
+        lig_coords = torch.tensor(lig_coords, device=self.device, dtype=FLOAT_TYPE)
+        lig_one_hot = torch.tensor(lig_one_hot, device=self.device, dtype=FLOAT_TYPE)
+        if True: #remove mean:
+            lig_coords = lig_coords - lig_coords.mean(0)
+        lig_mask = torch.repeat_interleave(
+            torch.arange(repeats, device=self.device, dtype=INT_TYPE),
+            len(lig_coords)
+        )
+        ligand_data = {
+            'x': lig_coords.repeat(repeats, 1),
+            'one_hot': lig_one_hot.repeat(repeats, 1),
+            'mask': lig_mask,
+        }
+        return ligand_data
+
     def prepare_pocket(self, biopython_residues, repeats=1):
 
         if self.pocket_representation == 'CA':
@@ -780,7 +817,7 @@ class LigandPocketDDPM(pl.LightningModule):
     def generate_ligands(self, pdb_file, n_samples, pocket_ids=None,
                          ref_ligand=None, num_nodes_lig=None, sanitize=False,
                          largest_frag=False, relax_iter=0, timesteps=None,
-                         n_nodes_bias=0, n_nodes_min=0, ddim=0, ddim_nu=1, **kwargs):
+                         n_nodes_bias=0, n_nodes_min=0, ddim=0, ddim_nu=1, style_vector=False, sdf_file=None, **kwargs):
         """
         Generate ligands given a pocket
         Args:
@@ -821,7 +858,16 @@ class LigandPocketDDPM(pl.LightningModule):
             residues = utils.get_pocket_from_ligand(pdb_struct, ref_ligand)
 
         pocket = self.prepare_pocket(residues, repeats=n_samples)
-
+        if style_vector:
+            ligand_true = self.prepare_ligand(sdf_file, repeats=n_samples)
+            xh_lig = torch.cat([ligand_true['x'], ligand_true['one_hot']], dim=1)
+            xh_pocket = torch.cat([pocket['x'], pocket['one_hot']], dim=1)
+            style_ligand = self.ddpm.style_encoder(xh_lig, xh_pocket, ligand_true['mask'],  pocket['mask'])
+            print("Using style vector")
+        else:
+            style_ligand = None
+            print("Not using style vector")
+        
         # Pocket's center of mass
         pocket_com_before = scatter_mean(pocket['x'], pocket['mask'], dim=0)
 
@@ -857,7 +903,7 @@ class LigandPocketDDPM(pl.LightningModule):
 
             xh_lig, xh_pocket, lig_mask, pocket_mask = self.ddpm.inpaint(
                 ligand, pocket, lig_mask_fixed, pocket_mask_fixed,
-                timesteps=timesteps, ddim=ddim, ddim_nu=ddim_nu, **kwargs)
+                timesteps=timesteps, ddim=ddim, ddim_nu=ddim_nu, style_ligand=style_ligand, **kwargs)
 
         # Use conditional generation
         elif type(self.ddpm) == ConditionalDDPM:
