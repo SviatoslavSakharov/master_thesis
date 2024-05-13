@@ -25,6 +25,8 @@ class GCL(nn.Module):
 
         self.conditional_linear_layer = nn.Linear(hidden_nf, hidden_nf)
 
+        self.layer_norm = nn.LayerNorm(hidden_nf)
+
         if self.attention:
             self.att_mlp = nn.Sequential(
                 nn.Linear(hidden_nf, 1),
@@ -63,9 +65,15 @@ class GCL(nn.Module):
 
             out_ligand = out[:len(mask_atoms)]
             out_pocket = out[len(mask_atoms):]
-            out_ligand_cond = out_ligand + style_embedding[mask_atoms]
 
+            #### weak conditining
+            out_ligand_cond = out_ligand + style_embedding[mask_atoms]
             out = torch.cat([out_ligand_cond, out_pocket], dim=0)
+
+            ##### strong conditioning with normalization
+            # out_ligand_cond = out_ligand * style_embedding[mask_atoms]
+            # out = torch.cat([out_ligand_cond, out_pocket], dim=0)
+            # out = self.layer_norm(out)
 
         else:
             out = x + self.node_mlp(agg)

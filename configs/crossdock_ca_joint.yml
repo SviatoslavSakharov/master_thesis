@@ -1,17 +1,19 @@
-run_name: 'SE3-inpaint-CA-style-ligand-strong_plus-2'
-logdir: '/home/domainHomes/ssakharov/master_thesis/logdir'
+run_name: 'SE3-inpaint-CA-style-ligand-strong'
+logdir: '/home/ssviatoslav/master_thesis/logdir'
+# logdir: '/home/domainHomes/ssakharov/master_thesis/logdir'
 wandb_params:
-  mode: 'online' #'online'  # disabled, offline, online
+  mode: 'disabled' #'online' #'online'  # disabled, offline, online
   entity: 'sviatoslavs999'
   group: null
 dataset: 'crossdock'
-datadir: '/home/domainHomes/ssakharov/master_thesis/crossdocked/processed_crossdock_noH_ca_only_temp'
+datadir: '/home/ssviatoslav/master_thesis/crossdocked/processed_crossdock_noH_ca_only_temp'
+# datadir: '/home/domainHomes/ssakharov/master_thesis/crossdocked/processed_crossdock_noH_ca_only_temp'
 enable_progress_bar: True
 num_sanity_val_steps: 0
 
 mode: 'joint'  # joint, pocket_conditioning
 pocket_representation: 'CA'  # CA, full-atom
-batch_size: 64 #72
+batch_size: 72
 lr: 1.0e-3
 noise_factor: 1.0
 n_epochs: 1000
