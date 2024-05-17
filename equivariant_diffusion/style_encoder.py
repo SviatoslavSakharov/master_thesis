@@ -2,10 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from equivariant_diffusion.egnn_new import EGNN, GNN
-from equivariant_diffusion.en_diffusion import EnVariationalDiffusion
 from equivariant_diffusion.egnn_new import unsorted_segment_sum
-remove_mean_batch = EnVariationalDiffusion.remove_mean_batch
 import numpy as np
+from torch_scatter import scatter_mean
 
 class StyleEncoder(nn.Module):
     def __init__(self, atom_nf, residue_nf,
@@ -71,26 +70,37 @@ class StyleEncoder(nn.Module):
             nn.Linear(hidden_nf, hidden_nf),
         )
 
-    def forward(self, xh_atoms, xh_residues, mask_atoms, mask_residues):
+    @staticmethod
+    def remove_mean_batch(x, indices):
+        mean = scatter_mean(x, indices, dim=0)
+        x = x - mean[indices]
+        return x
+
+    def forward(self, xh_atoms, mask_atoms):
 
         x_atoms = xh_atoms[:, :self.n_dims].clone()
-        h_atoms = xh_atoms[:, self.n_dims:].clone()
+        x_atoms = self.remove_mean_batch(x_atoms, mask_atoms)
 
-        x_residues = xh_residues[:, :self.n_dims].clone()
-        h_residues = xh_residues[:, self.n_dims:].clone()
+        h_atoms = xh_atoms[:, self.n_dims:].clone()
+        h_atoms = self.atom_encoder(h_atoms)
+
+        # x_residues = xh_residues[:, :self.n_dims].clone()
+        # h_residues = xh_residues[:, self.n_dims:].clone()
 
         # embed atom features and residue features in a shared space
-        h_atoms = self.atom_encoder(h_atoms)
-        h_residues = self.residue_encoder(h_residues)
+        # h_residues = self.residue_encoder(h_residues)
 
         # combine the two node types
-        x = torch.cat((x_atoms, x_residues), dim=0)
-        h = torch.cat((h_atoms, h_residues), dim=0)
-        mask = torch.cat([mask_atoms, mask_residues])
+        # x = torch.cat((x_atoms, x_residues), dim=0)
+        # h = torch.cat((h_atoms, h_residues), dim=0)
+        # mask = torch.cat([mask_atoms, mask_residues])
+        x = x_atoms
+        h = h_atoms
+        mask = mask_atoms
 
 
         # get edges of a complete graph
-        edges = self.get_edges(mask_atoms, mask_residues, x_atoms, x_residues)
+        edges = self.get_edges(mask_atoms, x_atoms)
         assert torch.all(mask[edges[0]] == mask[edges[1]])
 
 
@@ -115,22 +125,22 @@ class StyleEncoder(nn.Module):
 
         return style_ligand
 
-    def get_edges(self, batch_mask_ligand, batch_mask_pocket, x_ligand, x_pocket):
+    def get_edges(self, batch_mask_ligand, x_ligand):
         adj_ligand = batch_mask_ligand[:, None] == batch_mask_ligand[None, :]
-        adj_pocket = batch_mask_pocket[:, None] == batch_mask_pocket[None, :]
-        adj_cross = batch_mask_ligand[:, None] == batch_mask_pocket[None, :]
+        # adj_pocket = batch_mask_pocket[:, None] == batch_mask_pocket[None, :]
+        # adj_cross = batch_mask_ligand[:, None] == batch_mask_pocket[None, :]
 
         if self.edge_cutoff_l is not None:
             adj_ligand = adj_ligand & (torch.cdist(x_ligand, x_ligand) <= self.edge_cutoff_l)
 
-        if self.edge_cutoff_p is not None:
-            adj_pocket = adj_pocket & (torch.cdist(x_pocket, x_pocket) <= self.edge_cutoff_p)
+        # if self.edge_cutoff_p is not None:
+        #     adj_pocket = adj_pocket & (torch.cdist(x_pocket, x_pocket) <= self.edge_cutoff_p)
 
-        if self.edge_cutoff_i is not None:
-            adj_cross = adj_cross & (torch.cdist(x_ligand, x_pocket) <= self.edge_cutoff_i)
+        # if self.edge_cutoff_i is not None:
+        #     adj_cross = adj_cross & (torch.cdist(x_ligand, x_pocket) <= self.edge_cutoff_i)
 
-        adj = torch.cat((torch.cat((adj_ligand, adj_cross), dim=1),
-                         torch.cat((adj_cross.T, adj_pocket), dim=1)), dim=0)
-        edges = torch.stack(torch.where(adj), dim=0)
+        # adj = torch.cat((torch.cat((adj_ligand, adj_cross), dim=1),
+        #                  torch.cat((adj_cross.T, adj_pocket), dim=1)), dim=0)
+        edges = torch.stack(torch.where(adj_ligand), dim=0)
 
         return edges

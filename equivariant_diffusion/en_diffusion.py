@@ -373,7 +373,7 @@ class EnVariationalDiffusion(nn.Module):
         xh_lig = torch.cat([ligand['x'], ligand['one_hot']], dim=1)
         xh_pocket = torch.cat([pocket['x'], pocket['one_hot']], dim=1)
 
-        style_ligand = self.style_encoder(xh_lig, xh_pocket, ligand['mask'],  pocket['mask'])
+        style_ligand = self.style_encoder(xh_lig, ligand['mask'])
 
         # Find noised representation
         z_t_lig, z_t_pocket, eps_t_lig, eps_t_pocket = \
