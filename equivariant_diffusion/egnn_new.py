@@ -25,9 +25,10 @@ class GCL(nn.Module):
 
         self.conditional_linear_layer = nn.Linear(hidden_nf, hidden_nf)
 
-        self.conditional_layer_norm = nn.LayerNorm(hidden_nf)
-        self.conditional_activation = nn.SiLU()
-        print(f"Using Strong Conditioning")
+        # self.conditional_layer_norm = nn.LayerNorm(hidden_nf)
+        # self.conditional_activation = nn.SiLU()
+        # print(f"Using Strong Conditioning")
+        print(f"Using Weak Conditioning")
 
         if self.attention:
             self.att_mlp = nn.Sequential(
@@ -69,22 +70,22 @@ class GCL(nn.Module):
             out_pocket = out[len(mask_atoms):]
 
             #### weak conditining
-            # out_ligand_cond = out_ligand + style_embedding[mask_atoms]
-            # out = torch.cat([out_ligand_cond, out_pocket], dim=0)
+            out_ligand_cond = out_ligand + style_embedding[mask_atoms]
+            out = torch.cat([out_ligand_cond, out_pocket], dim=0)
 
             ##### strong conditioning 
-            mol_lig_normalized = []
-            for m in torch.unique(mask_residues):
-                indices = mask_atoms == m
-                h_mol = out_ligand[indices]
-                h_mol_norm = self.conditional_layer_norm(h_mol)
-                mol_lig_normalized.append(h_mol_norm)
+            # mol_lig_normalized = []
+            # for m in torch.unique(mask_residues):
+            #     indices = mask_atoms == m
+            #     h_mol = out_ligand[indices]
+            #     h_mol_norm = self.conditional_layer_norm(h_mol)
+            #     mol_lig_normalized.append(h_mol_norm)
 
-            out_ligand_norm = torch.cat(mol_lig_normalized, dim=0)
-            out_ligand_cond = out_ligand_norm * (1 + style_embedding[mask_atoms])
-            out_ligand_cond = self.conditional_activation(out_ligand_cond)
+            # out_ligand_norm = torch.cat(mol_lig_normalized, dim=0)
+            # out_ligand_cond = out_ligand_norm * (1 + style_embedding[mask_atoms])
+            # out_ligand_cond = self.conditional_activation(out_ligand_cond)
 
-            out = torch.cat([out_ligand_cond, out_pocket], dim=0)
+            # out = torch.cat([out_ligand_cond, out_pocket], dim=0)
 
         else:
             out = x + self.node_mlp(agg)

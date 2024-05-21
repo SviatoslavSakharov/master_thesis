@@ -1,4 +1,5 @@
-run_name: 'SE3-inpaint-CA-style-ligand-strong-temp'
+# run_name: 'SE3-inpaint-CA-style-ligand-only-strong-scale-shift-norm'
+run_name: 'SE3-inpaint-CA-style-ligand-only-weak-TEMP'
 logdir: '/home/ssviatoslav/master_thesis/logdir'
 # logdir: '/home/domainHomes/ssakharov/master_thesis/logdir'
 wandb_params:
@@ -54,9 +55,9 @@ diffusion_params:
   diffusion_loss_type: 'l2'  # vlb, l2
   normalize_factors: [1, 1]  #[10, 4]  # [x, h]
 
-eval_epochs: 50
-visualize_sample_epoch: 50
-visualize_chain_epoch: 50
+eval_epochs: 5000 #50
+visualize_sample_epoch: 5000 #50
+visualize_chain_epoch: 5000 #50
 eval_params:
   n_eval_samples: 100
   eval_batch_size: 100
