@@ -416,27 +416,27 @@ class LigandPocketDDPM(pl.LightningModule):
 
         suffix = '' if self.mode == 'joint' else '_given_pocket'
 
-        if (self.current_epoch + 1) % self.eval_epochs == 0:
-            tic = time()
+        # if (self.current_epoch + 1) % self.eval_epochs == 0:
+        #     tic = time()
 
-            sampling_results = getattr(self, 'sample_and_analyze' + suffix)(
-                self.eval_params.n_eval_samples, self.val_dataset,
-                batch_size=self.eval_batch_size)
-            self.log_metrics(sampling_results, 'val')
+        #     sampling_results = getattr(self, 'sample_and_analyze' + suffix)(
+        #         self.eval_params.n_eval_samples, self.val_dataset,
+        #         batch_size=self.eval_batch_size)
+        #     self.log_metrics(sampling_results, 'val')
 
-            print(f'Evaluation took {time() - tic:.2f} seconds')
+        #     print(f'Evaluation took {time() - tic:.2f} seconds')
 
-        if (self.current_epoch + 1) % self.visualize_sample_epoch == 0:
-            tic = time()
-            getattr(self, 'sample_and_save' + suffix)(
-                self.eval_params.n_visualize_samples)
-            print(f'Sample visualization took {time() - tic:.2f} seconds')
+        # if (self.current_epoch + 1) % self.visualize_sample_epoch == 0:
+        #     tic = time()
+        #     getattr(self, 'sample_and_save' + suffix)(
+        #         self.eval_params.n_visualize_samples)
+        #     print(f'Sample visualization took {time() - tic:.2f} seconds')
 
-        if (self.current_epoch + 1) % self.visualize_chain_epoch == 0:
-            tic = time()
-            getattr(self, 'sample_chain_and_save' + suffix)(
-                self.eval_params.keep_frames)
-            print(f'Chain visualization took {time() - tic:.2f} seconds')
+        # if (self.current_epoch + 1) % self.visualize_chain_epoch == 0:
+        #     tic = time()
+        #     getattr(self, 'sample_chain_and_save' + suffix)(
+        #         self.eval_params.keep_frames)
+        #     print(f'Chain visualization took {time() - tic:.2f} seconds')
 
     @torch.no_grad()
     def sample_and_analyze(self, n_samples, dataset=None, batch_size=None):
