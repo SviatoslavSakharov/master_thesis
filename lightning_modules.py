@@ -162,6 +162,7 @@ class LigandPocketDDPM(pl.LightningModule):
             edge_embedding_dim=egnn_params.__dict__.get('edge_embedding_dim'),
         )
 
+        # self.style_encoder = None
         self.style_encoder = StyleEncoder(
             atom_nf=self.atom_nf,
             residue_nf=self.aa_nf,
@@ -862,7 +863,7 @@ class LigandPocketDDPM(pl.LightningModule):
             ligand_true = self.prepare_ligand(sdf_file, repeats=n_samples)
             xh_lig = torch.cat([ligand_true['x'], ligand_true['one_hot']], dim=1)
             xh_pocket = torch.cat([pocket['x'], pocket['one_hot']], dim=1)
-            style_ligand = self.ddpm.style_encoder(xh_lig, xh_pocket, ligand_true['mask'],  pocket['mask'])
+            style_ligand = self.ddpm.style_encoder(xh_lig, ligand_true['mask'])
             print("Using style vector")
         else:
             style_ligand = None

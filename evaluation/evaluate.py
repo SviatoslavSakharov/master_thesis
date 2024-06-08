@@ -1,4 +1,6 @@
-from ..analysis.metrics import MoleculeProperties
+import sys
+sys.path.append("/home/domainHomes/ssakharov/master_thesis/master_thesis")
+from analysis.metrics import MoleculeProperties
 from pathlib import Path
 import os
 import numpy as np
@@ -124,11 +126,12 @@ def calculate_qvina_score(basedir):
 
 
 if __name__ == "__main__":
-    parent = Path("processed_crossdock_noH_ca_only_temp\\reconstruction")
-    dirs = [
-        parent / "predictions_r1_t500",
-        parent / "predictions_r10_t50",
-    ]
+    parent = Path("/home/domainHomes/ssakharov/master_thesis/crossdocked/processed_crossdock_noH_ca_only_temp/ddim")
+    # dirs = [
+    #     parent / "predictions_r1_t500",
+    #     parent / "predictions_r10_t50",
+    # ]
+    dirs = [parent / folder for folder in os.listdir(parent) if "ddim" in folder]
     with Pool(processes=len(dirs)) as pool:
         args = ((_dir, i + 1, False) for i, _dir in enumerate(dirs))
         for _ in tqdm(pool.imap_unordered(evaluate_folder, args), total=len(dirs), position=0, desc="Main Progress"):

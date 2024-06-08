@@ -45,6 +45,21 @@ plt.rc("axes", linewidth=0.75)  # Axes line width
 plt.rc("figure", figsize=(8, 6))
 
 
+def read_times(folder):
+    """
+    Reads a txt file, separated by space, first column is the ligand name, second column is the time in seconds.
+
+    Args:
+    folder (str): folder path to the txt file.
+
+    Returns:
+    pd.DataFrame: The processed DataFrame.
+    """
+    # Load the CSV file
+    df = pd.read_csv(folder / "pocket_times.txt", sep=" ", header=None, dtype={0: str, 1: float})
+    df.columns = ["ligand", "time"]
+    return df
+
 def read_metrics(file_path):
     """
     Reads a CSV file, converts array-like strings into separate rows, and replaces "None" with NaN.
@@ -93,17 +108,17 @@ def read_metrics(file_path):
     return df_exploded
 
 
-def print_df_info(df, name=None):
+def print_df_info(df, name=None, metrics=["QED", "SA", "Lipinski", "Vina"]):
     if name:
         print(name)
-    metrics = ["QED", "SA", "Lipinski", "Vina"]
     for metric in metrics:
+        print(f"metric {metric}:")
         print(
             f"{metric} mean: {df[metric].mean():.2f}, {metric} std: {df[metric].std():.2f}, {metric} max: {df[metric].max():.2f}, {metric} min: {df[metric].min():.2f}"
         )
 
 
-def plot_metrics(dfs, names, subplots=(1, 4), figsize=(15, 5), include_paper_results=False, suptitle=None, save=None):
+def plot_metrics(dfs, names, **kwargs):
     """
     Plots barplots to compare each metric from multiple dataframes using mean with std lines.
     Each metric will have its own subplot.
@@ -123,10 +138,16 @@ def plot_metrics(dfs, names, subplots=(1, 4), figsize=(15, 5), include_paper_res
     combined_df = pd.concat(dfs, ignore_index=True)
 
     # List of metrics to compare (excluding the first column which might be an identifier and the last 'Source' column)
-    metrics = ["Vina", "QED", "SA", "Lipinski"]
+    metrics = kwargs.get("metrics", ["Vina", "QED", "SA", "Lipinski"])
+    rows = kwargs.get("rows", 1)
+    cols = len(metrics) // rows
+    figsize = kwargs.get("figsize", (15, 5))
+    suptitle = kwargs.get("suptitle", None)
+    save = kwargs.get("save", None)
+    include_paper_results = kwargs.get("include_paper_results", False)
 
     # Create subplots
-    fig, axes = plt.subplots(subplots[0], subplots[1], figsize=figsize)
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
     axes = axes.flatten()
     colors = sns.color_palette("tab10", n_colors=len(names))
     # Plot each metric in a separate subplot boxplot
@@ -150,9 +171,11 @@ def plot_metrics(dfs, names, subplots=(1, 4), figsize=(15, 5), include_paper_res
             tick.set_rotation(45)
     if title:
         fig.suptitle(suptitle)
-    plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.99])
+    else:
+        plt.tight_layout()
     if save:
-        plt.savefig("F:\\Studium\\MS\\thesis\\master_thesis\\img\\" + save)
+        plt.savefig(save)
 
     return None
 
@@ -233,19 +256,26 @@ def read_molecules(basedir):
     return mols
 
 
-def plot_mols(mols_arr, dfs_topN, names, file_name=None):
+def plot_mols(mols_arr, dfs_topN, names, file_name=None, true_mols_dir=None):
     assert len(mols_arr) == len(dfs_topN) == len(names)
     files = list(mols_arr[0].keys())
     if file_name:
         random_file = file_name
     else:
         random_file = np.random.choice(files)
+    true_mol_file = random_file.replace("_gen", "")
+    if true_mols_dir:
+        true_mol = open(true_mols_dir / true_mol_file, 'r').read()
+    else:
+        true_mol = None
     print(f"File: {random_file}")
-    cols = 5
+    cols = 6 if true_mol else 5
     rows = len(mols_arr)
+    print(f"Rows: {rows}, Cols: {cols}")
     view = py3Dmol.view(
         width=1500, height=int(rows * 250), linked=False, viewergrid=(rows, cols), js="https://3dmol.org/build/3Dmol.js"
     )
+    print(len(dfs_topN))
     for row in range(rows):
         print(f"row {row}: {names[row]}")
         topN = dfs_topN[row]
@@ -253,8 +283,93 @@ def plot_mols(mols_arr, dfs_topN, names, file_name=None):
         indices = topN_sample["indices"].values.astype(int)
         topN_mols = np.array(mols_arr[row][random_file])[indices]
         for i in range(cols):
-            view.addModelsAsFrames(topN_mols[i], viewer=(row, i))
+            if i == 0 and true_mol:
+                view.addModel(true_mol, format="sdf", viewer=(row, 0))
+                view.setStyle({"model": -1}, {"stick": {}}, viewer=(row, 0))
+            elif true_mol:
+                view.addModelsAsFrames(topN_mols[i-1], viewer=(row, i))
+            else:
+                view.addModelsAsFrames(topN_mols[i], viewer=(row, i))
             view.addStyle({"model": -1}, {"stick": {}}, viewer=(row, i))
 
     view.zoomTo()
     return view
+
+
+def plot_lineplot_vs(plot_dict, save=None, suptitle=None, **kwargs):
+    """
+    Plots lineplots to compare each metric from multiple dataframes using mean with std lines.
+    Each metric will have its own subplot.
+
+    Args:
+    plot_dict (dict): The dataframes to compare. {"label": {"dfs": [...], "names": [...]}}
+    """
+
+    # List of metrics to compare (excluding the first column which might be an identifier and the last 'Source' column)
+    metrics = kwargs.get("metrics", ["Vina", "QED", "SA", "Lipinski"])
+    rows = kwargs.get("rows", 1)
+    cols = len(metrics) // rows
+    figsize = kwargs.get("figsize", (15, 5))
+    xlabel = kwargs.get("xlabel", None)
+    # Create subplots
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    axes = axes.flatten()
+    # Plot each metric in a separate subplot boxplot
+    for i, metric in enumerate(metrics):
+        dfs = []
+        for label, data in plot_dict.items():
+            dfs_label = data["dfs"]
+            names_label = data["names"]
+            for j, df in enumerate(dfs_label):
+                df["Label"] = label
+                df["steps"] = int(names_label[j].split("_")[1])
+            # Combining the DataFrames
+            dfs.extend(dfs_label)
+        combined_df = pd.concat(dfs, ignore_index=True)
+        sns.lineplot(
+            data=combined_df, 
+            x="steps", 
+            y=metric, 
+            ax=axes[i], 
+            hue="Label",
+            errorbar=("se", 2),
+            marker="o",)
+
+        axes[i].set_title(metric)
+        axes[i].set_ylabel(metric)
+        if xlabel:
+            axes[i].set_xlabel(xlabel)
+
+        unique_steps = sorted(combined_df["steps"].unique())
+        axes[i].set_xticks(unique_steps)
+    if suptitle:
+        fig.suptitle(suptitle)
+    plt.tight_layout()
+    if save:
+        plt.savefig(save)
+    return None
+        
+
+def plot_times(dfs, names, **kwargs):
+    for i, df in enumerate(dfs):
+        df["step"] = names[i].split("_")[1]
+    combined_df = pd.concat(dfs, ignore_index=True)
+    figsize = kwargs.get("figsize", (15, 5))
+    save = kwargs.get("save", None)
+    fig, ax = plt.subplots(figsize=figsize)
+    line_plot = sns.lineplot(data=combined_df, x="step", y="time", marker="o", errorbar="sd", ax=ax)
+    line_data = line_plot.lines[0].get_xydata()
+    steps = line_data[:, 0]
+    mean_times = line_data[:, 1]
+    max_time = mean_times.max()
+    for step, mean_time in zip(steps, mean_times):
+        speed_up = max_time / mean_time
+        ax.annotate(f"{speed_up:.1f}x", (step, mean_time), textcoords="offset points", xytext=(0,10), ha='center')
+    title = kwargs.get("title", "Sampling Time vs Number of Steps")
+    plt.title(title)
+    plt.xlabel("Number of Steps")
+    plt.ylabel("Sampling Time in Seconds")
+    plt.tight_layout()
+    if save:
+        plt.savefig(save)
+    return None
