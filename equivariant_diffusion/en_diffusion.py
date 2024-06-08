@@ -373,7 +373,10 @@ class EnVariationalDiffusion(nn.Module):
         xh_lig = torch.cat([ligand['x'], ligand['one_hot']], dim=1)
         xh_pocket = torch.cat([pocket['x'], pocket['one_hot']], dim=1)
 
-        style_ligand = self.style_encoder(xh_lig, ligand['mask'])
+        if self.style_encoder:
+            style_ligand = self.style_encoder(xh_lig, ligand['mask'])
+        else:
+            style_ligand = None
 
         # Find noised representation
         z_t_lig, z_t_pocket, eps_t_lig, eps_t_pocket = \
@@ -750,13 +753,13 @@ class EnVariationalDiffusion(nn.Module):
         schedule = self.get_repaint_schedule(resamplings, jump_length, timesteps)
         if ddim > 0:
             ## uncomment for linear schedule
-            # skip = timesteps // ddim
-            # seq = range(0, timesteps, skip)
-            # s = seq[-1]
-            ## uncomment for squeared schedule
-            seq = (np.linspace( 0, (timesteps *0.8 )**(1/2), ddim)** 2)
-            seq = [int(s) for s in list(seq)]
+            skip = timesteps // ddim
+            seq = range(0, timesteps, skip)
             s = seq[-1]
+            ## uncomment for squeared schedule
+            # seq = (np.linspace( 0, (timesteps *0.8 )**(1/2), ddim)** 2)
+            # seq = [int(s) for s in list(seq)]
+            # s = seq[-1]
         else:
             skip = 1
             s = timesteps - 1
@@ -766,13 +769,16 @@ class EnVariationalDiffusion(nn.Module):
                 s_array = torch.full((n_samples, 1), fill_value=s,
                                      device=z_lig.device)
                 if ddim > 0:
-                    t_array = torch.full((n_samples, 1), fill_value=timesteps if j==0 else seq[-j],
+                    s_index = seq.index(s)
+                    t = timesteps if s_index == len(seq) - 1 else seq[s_index + 1]
+                    t_array = torch.full((n_samples, 1), fill_value=t,
                                          device=z_lig.device)
                 else:
                     t_array = s_array + 1
                 # print(f"Current s {s_array[0]}, t = {t_array[0]}")
                 s_array = s_array / timesteps
                 t_array = t_array / timesteps
+
 
                 # sample known nodes from the input
                 gamma_s = self.inflate_batch_array(self.gamma(s_array),
@@ -826,29 +832,40 @@ class EnVariationalDiffusion(nn.Module):
                             self.unnormalize_z(z_lig, z_pocket)
 
                 # Noise combined representation
-                if j == n_denoise_steps - 1 and i < len(schedule) - 1:
-                    # Go back jump_length steps
-                    t = s + jump_length
-                    t_array = torch.full((n_samples, 1), fill_value=t,
-                                         device=z_lig.device)
-                    t_array = t_array / timesteps
-
-                    gamma_s = self.inflate_batch_array(self.gamma(s_array),
-                                                       ligand['x'])
-                    gamma_t = self.inflate_batch_array(self.gamma(t_array),
-                                                       ligand['x'])
-
-                    z_lig, z_pocket = self.sample_p_zt_given_zs(
-                        z_lig, z_pocket, ligand['mask'], pocket['mask'],
-                        gamma_t, gamma_s)
-
-                    s = t
-                if ddim > 0:
+                if ddim>0:
                     if -j - 2 < -len(seq):
                         break
-                    s = seq[-j-2]
+                    if j == n_denoise_steps - 1 and i < len(schedule) - 1:
+                        gamma_s = self.inflate_batch_array(self.gamma(s_array),
+                                                        ligand['x'])
+                        gamma_t = self.inflate_batch_array(self.gamma(t_array),
+                                                        ligand['x'])
+
+                        z_lig, z_pocket = self.sample_p_zt_given_zs(
+                            z_lig, z_pocket, ligand['mask'], pocket['mask'],
+                            gamma_t, gamma_s)
+                    else:
+                        s_index = seq.index(s)
+                        s = seq[s_index - 1]
                 else:
-                    s -= 1
+                    if j == n_denoise_steps - 1 and i < len(schedule) - 1:
+                        # Go back jump_length steps
+                        t = s + jump_length
+                        t_array = torch.full((n_samples, 1), fill_value=t,
+                                            device=z_lig.device)
+                        t_array = t_array / timesteps
+
+                        gamma_s = self.inflate_batch_array(self.gamma(s_array),
+                                                        ligand['x'])
+                        gamma_t = self.inflate_batch_array(self.gamma(t_array),
+                                                        ligand['x'])
+
+                        z_lig, z_pocket = self.sample_p_zt_given_zs(
+                            z_lig, z_pocket, ligand['mask'], pocket['mask'],
+                            gamma_t, gamma_s)
+
+                        s = t
+                    s -=1
                 if s < 0:
                     break
 
